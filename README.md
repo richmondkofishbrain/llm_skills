@@ -1,4 +1,4 @@
-# skills
+# llm_skills
 
 Personal agent skills for Claude Code and Codex, organised into category buckets.
 Both agents discover personal skills one level below their skills directory, so
@@ -10,8 +10,8 @@ are used by both agents.
 **Your own machine** (skills load un-namespaced as personal skills in both agents):
 
 ```bash
-git clone https://github.com/Pixxle/skills.git ~/repos/skills
-~/repos/skills/scripts/link-skills.sh
+git clone https://github.com/richmondkofishbrain/llm_skills.git ~/repos/llm_skills
+~/repos/llm_skills/scripts/link-skills.sh
 ```
 
 To install for only one agent:
@@ -27,7 +27,7 @@ The destinations default to `~/.claude/skills` and `~/.codex/skills`. Set
 **Claude plugin install** (installs as a namespaced plugin from `.claude-plugin/plugin.json`):
 
 ```bash
-npx skills@latest add Pixxle/skills
+npx skills@latest add richmondkofishbrain/llm_skills
 ```
 
 Run `scripts/list-skills.sh` to see everything, grouped by bucket.
