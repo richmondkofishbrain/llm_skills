@@ -18,7 +18,7 @@ only; `scripts/link-skills.sh` flattens them into both personal skill directorie
 
 - **This machine:** run `scripts/link-skills.sh`. Skills load as *personal* skills
   in both agents. Pass `--claude` or `--codex` to install for only one.
-- **Another machine / sharing:** `npx skills@latest add Pixxle/skills` installs from
+- **Another machine / sharing:** `npx skills@latest add richmondkofishbrain/llm_skills` installs from
   `.claude-plugin/plugin.json` as a *namespaced plugin*.
 - For Claude Code, don't combine the personal-link and plugin install methods on
   the same machine — the skills would load twice.

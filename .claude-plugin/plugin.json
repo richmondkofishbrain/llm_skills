@@ -1,5 +1,5 @@
 {
-  "name": "pixxle-skills",
+  "name": "llm-skills",
   "skills": [
     "./skills/engineering/bootstrap-context",
     "./skills/engineering/bump-deps",
