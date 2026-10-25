@@ -44,6 +44,7 @@ Run `scripts/list-skills.sh` to see everything, grouped by bucket.
 - [improve-codebase-architecture](skills/engineering/improve-codebase-architecture/SKILL.md) — find deepening and refactoring opportunities.
 - [map-system](skills/engineering/map-system/SKILL.md) — produce a deep, evidence-backed map of how a system is built.
 - [pr-comments](skills/engineering/pr-comments/SKILL.md) — turn existing findings into concise inline GitHub review comments.
+- [pr-story](skills/engineering/pr-story/SKILL.md) — turn a PR into a local, interactive story page of its diff for human review.
 - [propose-a-solution](skills/engineering/propose-a-solution/SKILL.md) — autonomously design a bold solution and write it up.
 - [prototype](skills/engineering/prototype/SKILL.md) — build a throwaway prototype to flesh out a design.
 - [review-with-docs](skills/engineering/review-with-docs/SKILL.md) — review a change branch against its spec with running evidence, then apply strict quality and security passes.

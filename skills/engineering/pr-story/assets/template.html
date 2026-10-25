@@ -1,0 +1,1517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="story-token" content="__SERVE_TOKEN__">
+<title>PR story</title>
+<style>
+:root {
+  --bg: #f4f2ee; --dot: #d9d5cc; --panel: #ffffff; --ink: #1d232b; --muted: #6b7280; --line: #e3e0d8;
+  --code-bg: #fbfaf8; --add-bg: #e6f6ea; --add-ink: #146c2e; --del-bg: #fdecec; --del-ink: #a1262b;
+  --changed: #d98a1c; --context: #9aa3ad; --test: #7b5cc4; --ui: #2f7fd1; --edge: #8a8f98; --ok: #1f8a4c; --open: #c27a12;
+  --kw: #a2399a; --ty: #23758a; --str: #b4471f; --num: #3b55c4; --com: #8b9099;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 20px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181d; --dot: #262b33; --panel: #1e2229; --ink: #e7e9ec; --muted: #9aa1ab; --line: #2d333c;
+    --code-bg: #191c22; --add-bg: #15301f; --add-ink: #7fd69a; --del-bg: #3a1a1c; --del-ink: #f19a9d;
+    --edge: #6c737e; --kw: #e08ad8; --ty: #6cc4d6; --str: #f0a37f; --num: #9fb0ff; --com: #7b818b;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181d; --dot: #262b33; --panel: #1e2229; --ink: #e7e9ec; --muted: #9aa1ab; --line: #2d333c;
+  --code-bg: #191c22; --add-bg: #15301f; --add-ink: #7fd69a; --del-bg: #3a1a1c; --del-ink: #f19a9d;
+  --edge: #6c737e; --kw: #e08ad8; --ty: #6cc4d6; --str: #f0a37f; --num: #9fb0ff; --com: #7b818b;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; overflow: hidden; }
+a { color: var(--ui); }
+code, pre, .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+:not(pre) > code { font-size: .92em; background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0 4px; border-radius: 4px; }
+
+#app { display: grid; grid-template-columns: clamp(270px, 28vw, 340px) 1fr; height: 100vh; }
+#app.collapsed { grid-template-columns: 0 1fr; }
+#rail { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; padding: 20px 18px 40px; z-index: 2; }
+#app.collapsed #rail { padding: 0; border: 0; }
+#viewport { position: relative; overflow: hidden; cursor: grab; touch-action: none;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 22px 22px; }
+#viewport.dragging, #viewport.dragging * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
+#viewport.space, #viewport.space * { cursor: grab !important; user-select: none !important; -webkit-user-select: none !important; }
+body.instant *, body.instant *::before { transition: none !important; }
+#canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#canvas.animate { transition: transform .55s cubic-bezier(.2,.7,.2,1); }
+#grid { position: relative; }
+#edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+
+/* Rail */
+.eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+h1 { font-size: 18px; line-height: 1.3; margin: 0 0 6px; }
+.meta { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+.meta a { color: inherit; }
+.intent { background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 18px; }
+.storyhead { display: flex; justify-content: space-between; align-items: baseline; }
+.progress { font-size: 11.5px; color: var(--muted); }
+.chapters { list-style: none; padding: 0; margin: 0 0 20px; }
+.chapters li { border: 1px solid transparent; border-radius: 10px; padding: 9px 10px; cursor: pointer; margin-bottom: 4px; position: relative;
+  display: grid; grid-template-columns: 28px 1fr; align-items: start; }
+.chapters li:hover { background: var(--code-bg); }
+.chapters li.active { border-color: var(--line); background: var(--code-bg); }
+.chapters .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--line); font-size: 11px; font-weight: 600; margin-top: 1px; }
+.chapters li.active .n { background: var(--ink); color: var(--panel); }
+.chapters li.done .n { background: var(--ok); color: #fff; }
+.chapters .t { font-weight: 600; }
+.chapters li.done:not(.active) .t { color: var(--muted); }
+.chapters .s { grid-column: 2; color: var(--muted); font-size: 12.5px; margin: 4px 0 0; display: none; }
+.chapters li.active .s { display: block; }
+.chapters .tick { grid-column: 2; justify-self: start; margin: 8px 0 0; display: none; font-size: 12px; color: var(--muted); align-items: center; gap: 6px; cursor: pointer; }
+.chapters li.active .tick { display: inline-flex; }
+.checks { list-style: none; padding: 0; margin: 0; }
+.checks li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.badge { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+.badge.verified { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.badge.open { background: color-mix(in srgb, var(--open) 18%, transparent); color: var(--open); }
+.checks .why { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.coverage { font-size: 12.5px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); margin: 0 0 20px; display: flex; gap: 8px; align-items: flex-start; }
+.coverage .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--ok); }
+.coverage.bad .dot { background: var(--del-ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--muted); margin: 6px 0 20px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+.hint { color: var(--muted); font-size: 12px; margin-top: 18px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: inherit; }
+
+/* Toolbar */
+#toolbar { position: absolute; right: 16px; top: 16px; display: flex; gap: 6px; z-index: 3; }
+#toolbar.left { left: 16px; right: auto; }
+.tb { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 12.5px; cursor: pointer; box-shadow: var(--shadow); }
+.tb:hover { border-color: var(--muted); }
+#chapter-chip { position: absolute; left: 16px; bottom: 16px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+  border-radius: 999px; padding: 6px 14px; font-size: 12.5px; z-index: 3; display: none; white-space: nowrap; max-width: calc(100% - 240px); overflow: hidden; text-overflow: ellipsis; }
+
+/* Minimap */
+#minimap { position: absolute; right: 16px; bottom: 16px; width: 190px; height: 120px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: var(--shadow); z-index: 3; overflow: hidden; cursor: crosshair; }
+#minimap svg { width: 100%; height: 100%; display: block; }
+#minimap .mm-node { fill: var(--line); }
+#minimap .mm-node.lit { fill: var(--muted); }
+#minimap .mm-node.rev { fill-opacity: .35; }
+#minimap .mm-view { fill: color-mix(in srgb, var(--ui) 10%, transparent); stroke: var(--ui); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+#chapter-chip b { margin-right: 6px; }
+
+/* Nodes */
+.node { cursor: auto; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--role); border-radius: 12px; box-shadow: var(--shadow); transition: opacity .35s, filter .35s, box-shadow .2s; position: absolute; z-index: 1; }
+/* Only the review tag fades a box, and it fades the contents, not the tag itself. */
+.node > header, .node > .body { transition: opacity .25s, filter .25s; }
+.node.reviewed > header, .node.reviewed > .body { opacity: .4; filter: grayscale(.5); }
+.node.stub { --role: var(--g); }
+.node.stub header { cursor: pointer; }
+.stub-list { margin: 0 0 10px; padding-left: 18px; font-size: 12.5px; color: var(--muted); }
+.stub-list li { margin-bottom: 3px; }
+.rail-hide { float: right; margin: -6px -6px 0 10px; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel);
+  color: var(--muted); font-size: 15px; cursor: pointer; }
+.rail-hide:hover, .rail-show:hover { color: var(--ink); border-color: var(--muted); }
+.rail-show { position: absolute; left: 16px; top: 16px; z-index: 3; display: none; font-size: 15px; }
+#app.collapsed .rail-show { display: block; }
+.node.inch { box-shadow: 0 0 0 2px color-mix(in srgb, var(--role) 50%, transparent), var(--shadow); }
+.node .kind-right { display: flex; gap: 6px; align-items: center; }
+.node .rv { position: absolute; top: -12px; right: 14px; z-index: 2; height: 23px; padding: 0 10px 0 7px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--muted); font: 600 11px/1 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; box-shadow: var(--shadow);
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
+.node .rv .bx { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid currentColor; display: inline-grid; place-items: center; font-size: 9px; line-height: 1; }
+.node.reviewed .rv .bx { background: #fff; border-color: #fff; color: var(--ok); }
+.node .rv:hover { border-color: var(--ok); color: var(--ok); }
+.node.reviewed .rv { background: var(--ok); border-color: var(--ok); color: #fff; }
+.node .cm-pill { font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--ui); font-weight: 600; }
+.node.spot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--role) 35%, transparent), var(--shadow); }
+.node header { padding: 15px 14px 8px; border-bottom: 1px solid var(--line); cursor: zoom-in; }
+.node .kind { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--role); font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+.node .pills { display: flex; gap: 3px; }
+.node .pill.on { background: var(--role); color: #fff; }
+.node .pill { font-size: 10px; min-width: 16px; height: 16px; border-radius: 8px; display: inline-grid; place-items: center; background: var(--line); color: var(--muted); padding: 0 4px; letter-spacing: 0; }
+.node h3 { margin: 2px 0 0; font-size: 14.5px; }
+.node .file { font-size: 11.5px; color: var(--muted); margin-top: 2px; word-break: break-all; }
+.node .file a { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
+.node .file a:hover { color: var(--ui); border-color: var(--ui); }
+.node .body { padding: 10px 14px 12px; }
+.node .note { margin: 0 0 8px; font-size: 13px; }
+.node .note.muted { color: var(--muted); }
+.role-changed { --role: var(--changed); }
+.role-context { --role: var(--context); }
+.role-test { --role: var(--test); }
+.role-ui { --role: var(--ui); }
+.role-warn { --role: var(--del-ink); }
+pre.hunk { margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 0; font-size: 12px; line-height: 1.6; }
+pre.hunk > div { white-space: normal; display: grid; grid-template-columns: 34px 14px 1fr; padding-right: 12px; }
+pre.hunk { tab-size: 4; }
+/* Leading whitespace sits in its own box, so a wrapped line continues under its own code. */
+pre.hunk .tx { display: flex; min-width: 0; }
+pre.hunk .ind { white-space: pre; flex: none; }
+pre.hunk .rest { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; flex: 1; }
+pre.hunk .ln { color: var(--muted); opacity: .6; text-align: right; padding-right: 6px; user-select: none; }
+pre.hunk .sg { color: var(--muted); user-select: none; }
+pre.hunk .add { background: var(--add-bg); }
+pre.hunk .add .sg { color: var(--add-ink); }
+pre.hunk .del { background: var(--del-bg); }
+pre.hunk .del .sg { color: var(--del-ink); }
+pre.hunk .del .tx { opacity: .75; }
+pre.hunk .gap { color: var(--muted); opacity: .6; }
+/* Expand rows, like GitHub's: a tinted row whose gutter holds the expand buttons. */
+pre.hunk > div.xp { grid-template-columns: 48px 1fr; background: color-mix(in srgb, var(--ui) 9%, transparent); }
+pre.hunk > div.xp:first-child { margin-top: -6px; border-radius: 7px 7px 0 0; }
+pre.hunk > div.xp:last-child { margin-bottom: -6px; border-radius: 0 0 7px 7px; }
+pre.hunk .xg { display: flex; flex-direction: column; background: color-mix(in srgb, var(--ui) 18%, transparent); border-radius: inherit; }
+pre.hunk .xg button { display: flex; align-items: center; justify-content: center; height: 22px; padding: 0; border: 0;
+  background: none; color: var(--ui); cursor: pointer; border-radius: inherit; }
+pre.hunk .xg button:hover { background: var(--ui); color: #fff; }
+pre.hunk .xg svg { width: 16px; height: 16px; fill: currentColor; }
+pre.hunk .xp .ct { align-self: center; padding-left: 10px; color: var(--muted); font-size: 11.5px; }
+pre.hunk .ln.cm { cursor: pointer; }
+pre.hunk .ln.cm:hover { color: var(--ui); opacity: 1; text-decoration: underline; }
+pre.hunk .ln.has { color: var(--ui); opacity: 1; font-weight: 700; }
+pre.hunk > div.rsel { box-shadow: inset 3px 0 0 var(--ui);
+  background-image: linear-gradient(color-mix(in srgb, var(--ui) 14%, transparent), color-mix(in srgb, var(--ui) 14%, transparent)); }
+.thread { white-space: normal; font: 12.5px/1.45 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; margin: 4px 10px 8px 48px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+.cmt { padding: 7px 10px; border-top: 1px solid var(--line); }
+.cmt:first-child { border-top: 0; }
+.cmt .hd { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.cmt .who { font-weight: 600; }
+.cmt .when, .cmt .acts { color: var(--muted); font-size: 11px; }
+.cmt .acts { margin-left: auto; display: flex; gap: 8px; }
+.cmt .acts a, .cmt .acts button { color: var(--ui); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: none; }
+.cmt .b { margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.thread.folded .cmt .b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
+.thread-toggle { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: var(--code-bg); color: var(--ui);
+  font: 600 11.5px/1 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; padding: 7px 10px; cursor: pointer; }
+.cmt.draft { background: color-mix(in srgb, var(--open) 9%, transparent); }
+.cmt.pending { background: color-mix(in srgb, var(--ui) 7%, transparent); }
+.composer { padding: 8px 10px; }
+.composer textarea, .review-box textarea { width: 100%; min-height: 70px; resize: vertical; font: inherit; color: var(--ink); background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.composer .row, .review-box .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; align-items: center; }
+.composer .row .tip { margin-right: auto; color: var(--muted); font-size: 11px; }
+.btn { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+.btn.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.btn.warn { background: var(--open); border-color: var(--open); color: #fff; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.tx .kw { color: var(--kw); } .tx .ty { color: var(--ty); } .tx .st { color: var(--str); } .tx .nu { color: var(--num); } .tx .co { color: var(--com); font-style: italic; } .tx .at { color: var(--kw); }
+
+.same { margin-top: 10px; font-size: 12.5px; }
+.same summary { cursor: pointer; color: var(--ui); font-weight: 600; }
+.same-item { margin-top: 8px; }
+.same-item .file { font-size: 11.5px; color: var(--muted); margin-bottom: 3px; word-break: break-all; }
+.same-item .file a { color: inherit; }
+
+/* Journey */
+.steps { display: flex; flex-direction: column; gap: 6px; }
+.step { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.step .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--ui) 14%, transparent); color: var(--ui); font-size: 11px; font-weight: 700; flex: none; }
+.step.final .dot { background: var(--ui); color: #fff; }
+
+/* Snapshots */
+.snaps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.snaps .name { grid-column: 1 / -1; font-size: 12px; font-weight: 600; margin-top: 4px; }
+.snaps figure { margin: 0; }
+.snaps figcaption { font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+.snaps img { width: 100%; display: block; border-radius: 6px; border: 1px solid var(--line); cursor: zoom-in; background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0 / 12px 12px; }
+.snaps .none { font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 6px; padding: 18px 8px; text-align: center; }
+.snaps .hint2 { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); }
+
+/* Glue */
+.glue ul { margin: 0; padding-left: 18px; font-size: 12.5px; }
+.glue li { margin-bottom: 4px; word-break: break-all; }
+.glue .ct { color: var(--muted); }
+
+/* Edge labels */
+.elabel { position: absolute; transform: translate(-50%, -50%); background: var(--bg); color: var(--muted); font-size: 11.5px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--line); white-space: nowrap; pointer-events: none; transition: opacity .35s; z-index: 2; }
+.elabel.dim { opacity: .15; }
+path.edge { fill: none; stroke: var(--edge); stroke-width: 1.6; transition: opacity .35s; }
+path.edge.dim { opacity: .12; }
+path.edge.hot { stroke: var(--ink); stroke-width: 2.5; }
+
+.frame { position: absolute; border: 1.5px solid color-mix(in srgb, var(--g) 38%, transparent); background: color-mix(in srgb, var(--g) 6%, transparent);
+  border-radius: 22px; pointer-events: none; z-index: 0; transition: opacity .35s; }
+.frame.active { border: 2.5px solid var(--g); background: color-mix(in srgb, var(--g) 9%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--g) 12%, transparent); }
+/* Group header: title, Review tick and collapse toggle on one row, the summary beneath. */
+.frame .ghead { position: absolute; top: 12px; left: 16px; right: 16px; pointer-events: auto; }
+.ghead .gtop { display: flex; align-items: center; gap: 8px; }
+.ghead .gacts { margin-left: auto; display: flex; gap: 6px; }
+.ghead button { height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--g) 45%, transparent); background: var(--panel);
+  color: var(--g); font: 600 11px/1 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ghead .grv .bx { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid currentColor; display: inline-grid; place-items: center; font-size: 9px; line-height: 1; }
+.ghead .grv.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.ghead .grv.on .bx { background: #fff; border-color: #fff; color: var(--ok); }
+.ghead .gs { margin-top: 8px; font-size: 13.5px; line-height: 1.45; color: color-mix(in srgb, var(--ink) 82%, transparent); max-width: 820px; }
+.ghead .gt { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--g);
+  background: color-mix(in srgb, var(--g) 14%, var(--bg)); }
+:root { --g-blue: #2f7fd1; --g-violet: #7b5cc4; --g-teal: #1f9488; --g-amber: #c9831a; --g-rose: #c44f6a; --g-green: #3d9a4b; --g-slate: #6b7686; }
+
+/* Review panel */
+.review-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 20px; font-size: 12.5px; }
+.review-box p { margin: 0 0 6px; }
+.review-box .muted { color: var(--muted); }
+.review-box .err { color: var(--del-ink); }
+.unplaced { list-style: none; padding: 0; margin: 6px 0 0; font-size: 12px; }
+.unplaced li { padding: 4px 0; border-top: 1px solid var(--line); }
+
+/* Lightbox */
+#lightbox { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(6px); z-index: 10; display: none; place-items: center; padding: 24px; }
+#lightbox.on { display: grid; }
+#lightbox .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; max-width: min(1100px, 100%); width: 100%; }
+#lightbox .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 13px; }
+#lightbox .cmp { position: relative; user-select: none; touch-action: none; cursor: ew-resize; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+#lightbox .cmp img { display: block; width: 100%; }
+#lightbox .cmp .after { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--split, 50%)); }
+#lightbox .cmp .bar { position: absolute; top: 0; bottom: 0; left: var(--split, 50%); width: 2px; background: var(--changed); transform: translateX(-1px); }
+#lightbox .cmp .tag { position: absolute; top: 8px; font-size: 11px; font-weight: 700; background: var(--panel); border: 1px solid var(--line); padding: 1px 6px; border-radius: 4px; }
+#lightbox .tip { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="rail"></aside>
+  <main id="viewport">
+    <div id="toolbar">
+      <button class="tb" id="btn-overview" title="Show everything (0)">Overview</button>
+      <button class="tb" id="btn-prev" title="Previous chapter (←)">←</button>
+      <button class="tb" id="btn-next" title="Next chapter (→)">→</button>
+      <button class="tb" id="btn-theme" title="Toggle page theme">Theme</button>
+    </div>
+    <button class="tb rail-show" id="rail-show" title="Show the story panel (S)">»</button>
+    <div id="chapter-chip"></div>
+    <div id="minimap" title="Click or drag to move around"></div>
+    <div id="canvas"><div id="grid"></div><svg id="edges"></svg></div>
+  </main>
+</div>
+<div id="lightbox"><div class="box">
+  <div class="top"><span id="lb-title"></span><button class="tb" id="lb-close">Close</button></div>
+  <div class="cmp" id="lb-cmp"></div>
+  <div class="tip">Drag across the image: left of the line is before, right is after. <kbd>Esc</kbd> closes.</div>
+</div></div>
+
+<script id="story" type="application/json">__STORY_JSON__</script>
+<script>
+const story = JSON.parse(document.getElementById("story").textContent);
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Backticks, **bold** and [links](https://…) in model-written prose; everything else is escaped.
+const md = s => esc(s)
+  .replace(/`([^`]+)`/g, "<code>$1</code>")
+  .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+  .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+// Reading state (ticks, collapsed groups, chapter) is kept per head commit, so a new push starts
+// fresh. Review drafts are kept per PR, so a new push or a rebuilt story never hides them.
+const DRAFT_FIELDS = ["drafts", "sent", "reviewBody", "reviewURL"];
+const store = {
+  key: `pr-story:${story.pr.number ?? story.pr.headRef}:${story.pr.head}`,
+  draftKey: `pr-story-drafts:${story.pr.number ?? story.pr.headRef}`,
+  read(key) { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch { return {}; } },
+  get() { return { ...this.read(this.key), ...this.read(this.draftKey) }; },
+  set(v) {
+    const drafts = Object.fromEntries(DRAFT_FIELDS.filter(f => f in v).map(f => [f, v[f]]));
+    const rest = Object.fromEntries(Object.entries(v).filter(([f]) => !DRAFT_FIELDS.includes(f)));
+    try {
+      localStorage.setItem(this.key, JSON.stringify(rest));
+      localStorage.setItem(this.draftKey, JSON.stringify(drafts));
+    } catch {}
+  },
+};
+// Drafts saved under the old per-commit key move to the per-PR one.
+(() => {
+  const old = store.read(store.key);
+  if (DRAFT_FIELDS.some(f => f in old) && !Object.keys(store.read(store.draftKey)).length) store.set(old);
+})();
+const canvas = $("#canvas"), grid = $("#grid"), viewport = $("#viewport"), svg = $("#edges");
+const TOKEN = $('meta[name="story-token"]').content;
+const storyDir = location.pathname.split("/").filter(Boolean).slice(-2, -1)[0];
+// The API exists only when serve.py handed out this page (it fills in the token).
+const api = TOKEN.startsWith("__") || !story.pr.number ? null : {
+  async call(path, init = {}) {
+    const res = await fetch(`/api/${storyDir}/${path}`, { ...init, headers: { "X-Story-Token": TOKEN, "Content-Type": "application/json", ...(init.headers || {}) } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  },
+};
+let comments = story.comments || [];
+let composerKey = null, renderedKeys = new Set();
+const lineKey = (path, side, line) => `${path}|${side}|${line}`;
+function threadIndex() {
+  const byId = Object.fromEntries(comments.map(c => [c.id, c]));
+  const index = {};
+  for (const c of comments) {
+    const root = (c.replyTo && byId[c.replyTo]) || c;
+    if (root.line == null) continue;
+    ((index[lineKey(root.path, root.side, root.line)] ||= {})[root.id] ||= []).push({ ...c, kind: "github" });
+  }
+  const state = store.get();
+  for (const d of state.drafts || []) ((index[lineKey(d.path, d.side, d.line)] ||= {})["draft"] ||= []).push({ ...d, kind: "draft" });
+  return index;
+}
+// GitHub threads start folded to a two-line preview, so long bot reviews don't stretch the box.
+const expandedThreads = new Set();
+function threadHTML(root, list) {
+  const folded = !expandedThreads.has(root) && list[0].kind === "github" && !list[0].pending;
+  const replies = list.length - 1;
+  const toggle = list[0].kind === "github" && !list[0].pending
+    ? `<button class="thread-toggle" data-thread="${esc(root)}">${folded ? (replies ? `Show thread · ${replies} ${replies === 1 ? "reply" : "replies"}` : "Show comment") : "Fold"}</button>` : "";
+  const shown = folded ? [list[0]] : list;
+  return `<aside class="thread${folded ? " folded" : ""}" data-interactive>${shown.map(commentHTML).join("")}${toggle}</aside>`;
+}
+// Bot reviews carry badges, HTML comments and tags; keep their words only.
+const cleanBody = body => body
+  .replace(/<!--[\s\S]*?-->/g, "")
+  .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+  .replace(/<[^>]+>/g, "")
+  .replace(/^#+\s*/gm, "")
+  .replace(/\n{3,}/g, "\n\n")
+  .trim();
+const when = iso => iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+const rangeLabel = c => c.startLine && c.startLine !== c.line ? `<span class="when">lines ${c.startLine}–${c.line}</span>` : "";
+let confirmingDelete = null;
+function commentHTML(c) {
+  const pendingActs = () => confirmingDelete === c.nodeId
+    ? `<span class="acts"><button data-rdel="${esc(c.nodeId)}" style="color:var(--del-ink)">Confirm delete</button><button data-rdel-cancel>Keep</button></span>`
+    : `<span class="acts"><button data-redit="${esc(c.nodeId)}">Edit</button><button data-rdel="${esc(c.nodeId)}">Delete</button></span>`;
+  if (c.kind === "github" && c.pending) {
+    return `<div class="cmt pending"><div class="hd"><span class="who">You</span><span class="badge open" title="Only you can see this until you submit your review on GitHub">pending</span>${rangeLabel(c)}${pendingActs()}</div>
+      <div class="b">${md(c.body)}</div></div>`;
+  }
+  const head = c.kind === "github"
+    ? `<span class="who">${esc(c.user)}</span>${rangeLabel(c)}<span class="when">${when(c.created)}</span><span class="acts"><a href="${esc(c.url)}" target="_blank" rel="noopener">Reply on GitHub</a></span>`
+    : c.kind === "draft"
+      ? `<span class="who">You</span><span class="badge open">draft</span>${rangeLabel(c)}<span class="acts"><button data-edit="${esc(c.id)}">Edit</button><button data-del="${esc(c.id)}">Delete</button></span>`
+      : "";
+  return `<div class="cmt ${c.kind}"><div class="hd">${head}</div><div class="b">${md(c.kind === "github" ? cleanBody(c.body) : c.body)}</div></div>`;
+}
+const nodeById = Object.fromEntries(story.nodes.map(n => [n.id, n]));
+
+// ---- Groups --------------------------------------------------------------
+// A group is a colored region around boxes that belong together. Its header shows a summary, a
+// Review tick for every box inside and a collapse toggle; a collapsed group shrinks to one stub box.
+const groups = (story.groups || []).map((g, i) => ({ ...g, i, id: `__g${i}` }));
+const groupOfNode = {};
+groups.forEach(g => g.nodes.forEach(id => { groupOfNode[id] ||= g; }));
+// Groups a chapter opened for this visit only; only the reader's own clicks are remembered.
+const openedForChapter = new Set();
+function isCollapsed(g) {
+  if (openedForChapter.has(g.id)) return false;
+  const saved = store.get().collapsedGroups || {};
+  return g.id in saved ? saved[g.id] : !!g.collapsed;
+}
+function setCollapsed(g, on) {
+  openedForChapter.delete(g.id);
+  const s = store.get();
+  s.collapsedGroups = { ...(s.collapsedGroups || {}), [g.id]: on };
+  store.set(s);
+}
+const hiddenNode = id => !!groupOfNode[id] && isCollapsed(groupOfNode[id]);
+// The box that stands for an id on the canvas: the box itself, or its collapsed group's stub.
+const shown = id => hiddenNode(id) ? groupOfNode[id].id : id;
+const shownIds = ids => [...new Set(ids.map(shown))];
+// What gets placed: every visible box, plus one stub per collapsed group, in its first box's spot.
+function layoutItems() {
+  const own = (id, n) => n && n !== id ? n : undefined;
+  const items = story.nodes.filter(n => !hiddenNode(n.id))
+    .map(n => ({ id: n.id, col: n.col, row: n.row, alignWith: own(n.id, n.alignWith && shown(n.alignWith)), after: own(n.id, n.after && shown(n.after)) }));
+  for (const g of groups.filter(isCollapsed)) {
+    const first = g.nodes.map(id => nodeById[id]).filter(Boolean).sort((a, b) => a.col - b.col || a.row - b.row)[0];
+    if (first) items.push({ id: g.id, col: first.col, row: first.row,
+      alignWith: own(g.id, first.alignWith && shown(first.alignWith)), after: own(g.id, first.after && shown(first.after)) });
+  }
+  return items;
+}
+function applyCollapse() {
+  story.nodes.forEach(n => { $("#node-" + n.id).style.display = hiddenNode(n.id) ? "none" : ""; });
+  groups.forEach(g => { $("#node-" + g.id).style.display = isCollapsed(g) ? "" : "none"; });
+}
+function toggleGroup(g, open = isCollapsed(g)) {
+  setCollapsed(g, !open);
+  layout();
+}
+function toggleGroupReviewed(g) {
+  const s = store.get(), reviewed = { ...(s.reviewed || {}) };
+  const all = g.nodes.every(id => reviewed[id]);
+  g.nodes.forEach(id => { reviewed[id] = !all; });
+  if (all && s.done) story.chapters.forEach((c, i) => { if (c.nodes.some(id => g.nodes.includes(id))) s.done[i] = false; });
+  s.reviewed = reviewed;
+  store.set(s);
+  syncReviewed();
+}
+const chaptersOf = id => story.chapters.map((c, i) => c.nodes.includes(id) ? i + 1 : null).filter(Boolean);
+
+if (story.pr.number) document.title = `PR ${story.pr.number} story`;
+
+// ---- Code ----------------------------------------------------------------
+// Every file gets the shared rules: strings, numbers and the literals below. A file's language,
+// picked by its name, adds its comment syntax, keywords, attributes, and whether a capitalised
+// word is a type. A file in no language gets the shared rules only, so nothing is guessed.
+const words = list => new Set(list.split(" "));
+const LITERALS = words("true false null nil");
+const LANGUAGES = {
+  swift: { line: "//", block: true, quotes: `"`, attributes: true, types: true, keywords: words(
+    "associatedtype actor async await break case catch class continue convenience default defer deinit do else enum " +
+    "extension fallthrough fileprivate final for func guard if import in init inout internal is lazy let mutating nonisolated " +
+    "open operator override private protocol public repeat required rethrows return self Self some any static struct subscript super " +
+    "switch throw throws try typealias var weak where while unowned get set willSet didSet") },
+  js: { line: "//", block: true, quotes: "\"'`", attributes: true, types: true, keywords: words(
+    "as async await break case catch class const continue debugger declare default delete do else enum export extends finally for " +
+    "from function get if implements import in instanceof interface keyof let namespace new of private protected public readonly " +
+    "return set static super switch this throw try type typeof undefined var void while yield") },
+  ruby: { line: "#", quotes: `"'`, types: true, keywords: words(
+    "alias and attr_accessor attr_reader begin break case class def do else elsif end ensure for if in lambda module next not or " +
+    "private proc protected raise require require_relative rescue return self then unless until when while yield") },
+  python: { line: "#", quotes: `"'`, attributes: true, types: true, keywords: words(
+    "and as assert async await break class continue def del elif else except finally for from global if import in is lambda " +
+    "nonlocal not or pass raise return self try while with yield None True False") },
+  shell: { line: "#", quotes: `"'`, keywords: words(
+    "case do done echo elif else esac exit export fi for function if in local readonly return set shift source then until while") },
+  yaml: { line: "#", quotes: `"'` },
+  graphql: { line: "#", quotes: `"`, attributes: true, types: true, keywords: words(
+    "directive enum extend fragment implements input interface mutation on query scalar schema subscription type union") },
+  strings: { block: true, quotes: `"` },
+  json: { quotes: `"` },
+};
+const EXTENSIONS = {
+  swift: "swift", js: "js", mjs: "js", cjs: "js", jsx: "js", ts: "js", tsx: "js", rb: "ruby", rake: "ruby", gemspec: "ruby",
+  py: "python", sh: "shell", bash: "shell", zsh: "shell", yml: "yaml", yaml: "yaml", graphql: "graphql", gql: "graphql",
+  strings: "strings", json: "json",
+};
+const FILENAMES = { Gemfile: "ruby", Podfile: "ruby", Fastfile: "ruby", Appfile: "ruby", Matchfile: "ruby", Pluginfile: "ruby",
+  Dangerfile: "ruby", Rakefile: "ruby", Brewfile: "ruby" };
+const PLAIN = { quotes: `"` };
+function languageOf(path) {
+  const name = (path || "").split("/").pop();
+  return LANGUAGES[Object.hasOwn(FILENAMES, name) ? FILENAMES[name] : EXTENSIONS[name.includes(".") && name.split(".").pop()]] || PLAIN;
+}
+const patterns = new Map();
+// One regex per language; the groups are comment, string, attribute, number, word.
+function patternFor(lang) {
+  if (!patterns.has(lang)) {
+    const comments = [lang.line === "//" && String.raw`\/\/.*$`, lang.line === "#" && String.raw`(?<!\S)#.*$`,
+      lang.block && String.raw`\/\*.*?(?:\*\/|$)`].filter(Boolean);
+    const strings = [...lang.quotes].map(q => `${q}(?:[^${q}\\\\]|\\\\.)*${q}`);
+    patterns.set(lang, new RegExp(`(${comments.join("|") || "(?!)"})|(${strings.join("|")})|(${lang.attributes ? String.raw`@\w+` : "(?!)"})|` +
+      String.raw`\b(\d+(?:\.\d+)?)\b|\b([A-Za-z_]\w*)\b`, "g"));
+  }
+  return patterns.get(lang);
+}
+function highlight(text, lang = PLAIN) {
+  const re = patternFor(lang);
+  re.lastIndex = 0;
+  let out = "", last = 0, m;
+  while ((m = re.exec(text))) {
+    out += esc(text.slice(last, m.index));
+    const [tok] = m;
+    if (m[1]) out += `<span class="co">${esc(tok)}</span>`;
+    else if (m[2]) out += `<span class="st">${esc(tok)}</span>`;
+    else if (m[3]) out += `<span class="at">${esc(tok)}</span>`;
+    else if (m[4]) out += `<span class="nu">${tok}</span>`;
+    else if (lang.keywords?.has(tok) || LITERALS.has(tok)) out += `<span class="kw">${tok}</span>`;
+    else if (lang.types && /^[A-Z]/.test(tok)) out += `<span class="ty">${tok}</span>`;
+    else out += tok;
+    last = m.index + tok.length;
+  }
+  return out + esc(text.slice(last));
+}
+// ---- Expanding excerpts ----------------------------------------------------
+// Like GitHub's expand arrows: reveal more of the file above, below or between an excerpt's ranges.
+const EXPAND_STEP = 20;
+const excerptOwners = Object.fromEntries(story.nodes.filter(n => n.kind === "code")
+  .flatMap(n => [n, ...(n.same || [])]).map(m => [m.id, m]));
+// Rebuilds an excerpt from its spans (indices into the file's lines), merging spans that touch.
+function rebuildExcerpt(m) {
+  const source = story.sources?.[m.file];
+  if (!source || !m.spans?.length) return;
+  const merged = [];
+  for (const [a, b] of [...m.spans].sort((x, y) => x[0] - y[0])) {
+    const last = merged.at(-1);
+    last && a <= last[1] + 1 ? last[1] = Math.max(last[1], b) : merged.push([a, b]);
+  }
+  m.spans = merged;
+  m.excerpt = merged.flatMap(([a, b], i) =>
+    [...(i ? [{ t: "gap", span: i, hidden: a - merged[i - 1][1] - 1 }] : []), ...source.slice(a, b + 1)]);
+}
+Object.values(excerptOwners).forEach(rebuildExcerpt);
+// Grows span `k` upward or downward by up to `count` lines, never past its neighbours or the file.
+function expandExcerpt(id, k, direction, count = EXPAND_STEP) {
+  const m = excerptOwners[id], spans = m.spans, length = story.sources[m.file].length;
+  if (direction === "up") spans[k][0] = Math.max(k ? spans[k - 1][1] + 1 : 0, spans[k][0] - count);
+  else spans[k][1] = Math.min(k + 1 < spans.length ? spans[k + 1][0] - 1 : length - 1, spans[k][1] + count);
+  rebuildExcerpt(m);
+  refreshCode();
+}
+// An arrow and a dashed line: up reveals lines above, down lines below, and both close a gap.
+const EXPAND_ICONS = {
+  up: `<path d="M8 1.5 4 5.5h2.75V9h2.5V5.5H12z"/><path d="M1 12.25h2v1.5H1zm4 0h2v1.5H5zm4 0h2v1.5H9zm4 0h2v1.5h-2z"/>`,
+  down: `<path d="M8 14.5 4 10.5h2.75V7h2.5v3.5H12z"/><path d="M1 2.25h2v1.5H1zm4 0h2v1.5H5zm4 0h2v1.5H9zm4 0h2v1.5h-2z"/>`,
+  all: `<path d="M8 0 4.5 3.5h2.25V6h2.5V3.5h2.25zm0 16-3.5-3.5h2.25V10h2.5v2.5h2.25z"/><path d="M1 7.25h2v1.5H1zm4 0h2v1.5H5zm4 0h2v1.5H9zm4 0h2v1.5h-2z"/>`,
+};
+function expanderHTML(id, k, direction, hidden, icon = direction) {
+  const count = Math.min(hidden, EXPAND_STEP);
+  const title = icon === "all" ? `Show the ${count} hidden ${count === 1 ? "line" : "lines"}`
+    : `Show ${count} more ${count === 1 ? "line" : "lines"} ${direction === "up" ? "above" : "below"}`;
+  return `<button data-xp="${esc(id)}" data-k="${k}" data-dir="${direction}" data-count="${count}" title="${title}" aria-label="${title}">
+    <svg viewBox="0 0 16 16" aria-hidden="true">${EXPAND_ICONS[icon]}</svg></button>`;
+}
+function expanderRow(buttons, text) {
+  return `<div class="gap xp" data-interactive><span class="xg">${buttons}</span><span class="ct">${text}</span></div>`;
+}
+function hunkHTML(lines, file, threads = {}, id) {
+  const lang = languageOf(file);
+  const m = id && excerptOwners[id];
+  const source = m && story.sources?.[m.file];
+  let top = "", bottom = "";
+  if (source) {
+    const above = m.spans[0][0], below = source.length - 1 - m.spans.at(-1)[1];
+    if (above) top = expanderRow(expanderHTML(id, 0, "up", above), `${above} ${above === 1 ? "line" : "lines"} above`);
+    if (below) bottom = expanderRow(expanderHTML(id, m.spans.length - 1, "down", below), `${below} ${below === 1 ? "line" : "lines"} below`);
+  }
+  let inRange = false;
+  return `<pre class="hunk">${top}${lines.map(l => {
+    if (l.t === "gap" && source && l.hidden) return expanderRow(l.hidden <= EXPAND_STEP
+      ? expanderHTML(id, l.span - 1, "down", l.hidden, "all")
+      : expanderHTML(id, l.span - 1, "down", l.hidden) + expanderHTML(id, l.span, "up", l.hidden),
+      `${l.hidden} hidden ${l.hidden === 1 ? "line" : "lines"}`);
+    if (l.t === "gap") return `<div class="gap"><span class="ln"></span><span class="sg"></span><span>⋯</span></div>`;
+    const sign = { add: "+", del: "−", ctx: "" }[l.t];
+    const num = l.t === "del" ? l.o : l.n;
+    const [, indent, rest] = l.text.match(/^(\s*)(.*)$/s);
+    const side = l.t === "del" ? "LEFT" : "RIGHT";
+    const key = file && lineKey(file, side, num);
+    const lineThreads = key && threads[key];
+    if (lineThreads) renderedKeys.add(key);
+    const commentable = file && l.c && story.pr.number;
+    const ln = `<span class="ln${commentable ? " cm" : ""}${lineThreads ? " has" : ""}"${commentable
+      ? ` data-key="${esc(key)}" data-h="${l.c}" title="Comment on this line, or drag to comment on several"` : ""}>${num ?? ""}</span>`;
+    // Rows of the range the composer is open for stay highlighted.
+    if (composerRange && key === composerRange.startKey) inRange = true;
+    const selected = inRange && composerRange;
+    if (composerRange && key === composerKey) inRange = false;
+    const row = `<div class="${l.t}${selected ? " rsel" : ""}">${ln}<span class="sg">${sign}</span><span class="tx"><span class="ind">${indent}</span><span class="rest">${highlight(rest, lang)}</span></span></div>`;
+    const thread = lineThreads ? Object.entries(lineThreads).map(([root, list]) => threadHTML(root, list)).join("") : "";
+    const composer = key && key === composerKey ? composerHTML(key) : "";
+    return row + thread + composer;
+  }).join("")}${bottom}</pre>`;
+}
+function composerHTML(key) {
+  const draft = (store.get().drafts || []).find(d => d.id === editingDraft);
+  const remote = comments.find(c => c.nodeId && c.nodeId === editingRemote);
+  const text = composerText ?? draft?.body ?? remote?.body ?? "";
+  const label = saving ? "Saving…" : remote ? "Update comment" : draft ? "Update draft" : api ? "Add to pending review" : "Save draft";
+  return `<aside class="thread composer" data-interactive><textarea placeholder="Leave a comment" data-key="${esc(key)}"${saving ? " disabled" : ""}>${esc(text)}</textarea>
+    ${composerError ? `<p class="err" style="margin:6px 0 0;font-size:12px">${esc(composerError)}</p>` : ""}
+    <div class="row"><span class="tip">${api && !draft ? "Only you see it until you submit your review on GitHub · " : ""}⌘↩ adds it · Esc cancels</span>
+      <button class="btn" data-cancel>Cancel</button><button class="btn primary" data-save${saving ? " disabled" : ""}>${label}</button></div></aside>`;
+}
+let editingDraft = null;
+// A pending GitHub comment being edited, the text typed so far (kept across re-renders), and
+// whether a save is in flight.
+let editingRemote = null, composerText = null, saving = false, composerError = "";
+function closeComposer() {
+  composerKey = null; composerRange = null; editingDraft = null; editingRemote = null; composerText = null; composerError = "";
+}
+// A multi-line comment: from startKey down to composerKey, as GitHub's start_line and line.
+let composerRange = null;
+
+// ---- Nodes ---------------------------------------------------------------
+// Code boxes widen to fit their longest line, up to this many characters; longer lines wrap.
+const MAX_CODE_COLUMNS = 150;
+let charWidth;
+function codeWidth(n) {
+  const lines = [n, ...(n.same || [])].flatMap(m => m.excerpt || []).filter(l => l.t !== "gap");
+  const longest = Math.max(0, ...lines.map(l => l.text.replace(/\t/g, "    ").length));
+  if (!charWidth) {
+    const ctx = document.createElement("canvas").getContext("2d");
+    ctx.font = `12px "SF Mono", ui-monospace, Menlo, monospace`;
+    charWidth = ctx.measureText("0".repeat(100)).width / 100;
+  }
+  const chrome = 28 + 2 + 48 + 12 + 5 + 8; // body padding, pre border, gutter, right padding, node borders, slack
+  return Math.ceil(Math.min(longest, MAX_CODE_COLUMNS) * charWidth + chrome);
+}
+const DEFAULT_W = { journey: 340, code: 540, snaps: 560, html: 620, note: 380, glue: 420, uncovered: 460 };
+function kindLabel(n) {
+  switch (n.kind) {
+    case "code": return n.role === "test" ? (n.changed ? "Test · changed" : "Test") : n.changed ? "Changed" : "Context · unchanged";
+    case "journey": return "In the app";
+    case "snaps": return n.pairs.some(p => p.before && p.after) ? "Snapshots · before / after" : n.pairs.every(p => !p.before) ? "Snapshots · new" : "Snapshots";
+    case "glue": return "Glue";
+    case "uncovered": return "Not in the story";
+    default: return n.label || (n.kind === "html" ? "Visual" : "Note");
+  }
+}
+function defaultRole(n) {
+  return { journey: "ui", html: "ui", snaps: "test", glue: "context", note: "context", uncovered: "warn" }[n.kind] || "context";
+}
+function nodeBody(n) {
+  const notes = (n.notes || []).map(t => `<p class="note">${md(t)}</p>`).join("");
+  switch (n.kind) {
+    case "journey":
+      return notes + `<div class="steps">${n.steps.map((s, i) =>
+        `<div class="step ${i === n.steps.length - 1 ? "final" : ""}"><span class="dot">${i + 1}</span><span>${md(s)}</span></div>`).join("")}</div>`;
+    case "code": return notes + `<div class="code-wrap">${codeHTML(n, threadIndex())}</div>`;
+    case "html": return (n.notes || []).map(t => `<p class="note muted">${md(t)}</p>`).join("") + (n.html || "");
+    case "note": return `<p class="note">${md(n.text || "")}</p>` + notes;
+    case "snaps": {
+      // A changed snapshot shows before and after side by side; a new or removed one shows its
+      // light and dark versions side by side instead, so no column is spent on a placeholder.
+      const byName = {};
+      for (const p of n.pairs) (byName[p.name] ||= []).push(p);
+      const fig = (p, side, caption) => `<figure><figcaption>${caption}</figcaption>
+        <img src="${p[side]}" alt="${esc(p.name)} ${esc(p.label)}" data-pair="${esc(p.path)}"></figure>`;
+      const names = Object.keys(byName);
+      const anyChanged = n.pairs.some(p => p.before && p.after);
+      return notes + `<div class="snaps">${names.map(name => {
+        const pairs = byName[name];
+        const title = names.length > 1 ? `<div class="name mono">${esc(name)}</div>` : "";
+        return title + pairs.map(p => p.before && p.after
+          ? fig(p, "before", `Before · ${esc(p.label)}`) + fig(p, "after", `After · ${esc(p.label)}`)
+          : p.after ? fig(p, "after", `New · ${esc(p.label)}`) : fig(p, "before", `Removed · ${esc(p.label)}`)).join("");
+      }).join("")}
+        <div class="hint2">${anyChanged ? "Click an image to compare before and after." : "Click an image to see it larger."}</div></div>`;
+    }
+    case "glue": {
+      const items = n.listed.map(f => `<li><span class="mono">${esc(f.path)}</span> <span class="ct">${f.binary ? "binary" : `+${f.additions} −${f.deletions}`}</span></li>`)
+        .concat(n.snapshotDirs.map(d => `<li><span class="mono">${esc(d.dir)}</span> <span class="ct">${d.count} reference images</span></li>`));
+      return notes + `<div class="glue"><ul>${items.join("")}</ul></div>`;
+    }
+    case "uncovered":
+      return `<p class="note">These changed lines aren't in any chapter. Read them in the PR.</p><div class="glue"><ul>${n.items.map(u =>
+        `<li><span class="mono">${esc(u.path)}</span> <span class="ct">${u.side} ${u.from}–${u.to}</span></li>`).join("")}</ul></div>`;
+  }
+  return notes;
+}
+function codeHTML(n, threads, open = false) {
+  return hunkHTML(n.excerpt, n.file, threads, n.id) + sameHTML(n, threads, open);
+}
+function sameHTML(n, threads, open) {
+  if (!n.same?.length) return "";
+  const items = n.same.map(m => `<div class="same-item"><div class="file mono"><a href="${esc(m.link)}" target="_blank" rel="noopener">${esc(m.file)}:${m.line}</a></div>${hunkHTML(m.excerpt, m.file, threads, m.id)}</div>`).join("");
+  return `<details class="same" data-interactive${open ? " open" : ""}><summary>The same edit in ${n.same.length} more ${n.same.length === 1 ? "place" : "places"}</summary>${items}</details>`;
+}
+// Re-render every code box's lines, threads and composer, then the rail's review panel.
+function refreshCode() {
+  const open = $(".composer textarea");
+  if (open && !open.disabled) composerText = open.value;
+  const threads = threadIndex();
+  renderedKeys = new Set();
+  for (const n of story.nodes.filter(x => x.kind === "code")) {
+    const wrap = $(`#node-${CSS.escape(n.id)} .code-wrap`);
+    const open = !!wrap.querySelector("details[open]");
+    wrap.innerHTML = codeHTML(n, threads, open);
+    const keys = new Set([n, ...(n.same || [])].flatMap(m => m.excerpt.filter(l => l.t !== "gap")
+      .map(l => lineKey(m.file, l.t === "del" ? "LEFT" : "RIGHT", l.t === "del" ? l.o : l.n))));
+    const count = Object.entries(threads).filter(([k]) => keys.has(k)).reduce((sum, [, byRoot]) => sum + Object.keys(byRoot).length, 0);
+    const pill = $(`#node-${CSS.escape(n.id)} .cm-pill`);
+    if (pill) pill.textContent = count ? `${count} ${count === 1 ? "thread" : "threads"}` : "";
+  }
+  renderReviewBox();
+  const ta = $(".composer textarea");
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+// Snapshots show at their real point size (pixels ÷ scale, @3x unless the node says otherwise),
+// two to a row, so an iPhone screen is about as wide as on a phone.
+function snapsWidth(n) {
+  const widest = Math.max(0, ...n.pairs.map(p => p.px || 0));
+  if (!widest) return DEFAULT_W.snaps;
+  const point = Math.min(widest / (n.scale || 3), 430);
+  return Math.ceil(point * 2 + 12 + 28 + 5 + 2);
+}
+function renderNodes() {
+  const cov = story.coverage;
+  if (cov.uncovered.length) {
+    const maxCol = Math.max(...story.nodes.map(n => n.col + (n.colSpan || 1)));
+    story.nodes.push({ id: "__uncovered", kind: "uncovered", title: "Changed lines outside the story", col: maxCol, row: 0, items: cov.uncovered });
+    nodeById.__uncovered = story.nodes.at(-1);
+  }
+  for (const n of story.nodes) {
+    const el = document.createElement("section");
+    el.className = `node role-${n.role || defaultRole(n)}`;
+    el.id = `node-${n.id}`;
+    const baseWidth = n.w || DEFAULT_W[n.kind] || 480;
+    el.style.width = (n.kind === "code" ? Math.max(baseWidth, codeWidth(n)) : n.kind === "snaps" && !n.w ? snapsWidth(n) : baseWidth) + "px";
+    const pills = chaptersOf(n.id).map(i => `<span class="pill" data-ch="${i}" title="Chapter ${i}">${i}</span>`).join("");
+    el.innerHTML = `
+      <button class="rv" data-rv="${esc(n.id)}" title="Mark this box reviewed (R when zoomed in)"><span class="bx"></span><span class="lb">Review</span></button>
+      <header title="Zoom to this box">
+        <div class="kind"><span>${kindLabel(n)}</span><span class="kind-right">${n.kind === "code" ? `<span class="cm-pill"></span>` : ""}<span class="pills">${pills}</span></span></div>
+        <h3>${md(n.title)}</h3>
+        ${n.file ? `<div class="file mono"><a href="${esc(n.link)}" target="_blank" rel="noopener" title="${n.changed ? "Comment on this line in the PR" : "Open on GitHub"}">${esc(n.file)}:${n.line}</a></div>` : ""}
+      </header>
+      <div class="body">${nodeBody(n)}</div>`;
+    grid.appendChild(el);
+    if (n.kind === "html" && n.script) {
+      try { new Function("el", "story", n.script)(el, story); } catch (e) { console.error(`node ${n.id} script`, e); }
+    }
+  }
+  for (const g of groups) {
+    const el = document.createElement("section");
+    el.className = "node stub";
+    el.id = `node-${g.id}`;
+    el.style.width = "400px";
+    el.style.setProperty("--g", `var(--g-${groupColor(g, g.i)})`);
+    el.innerHTML = `
+      <header title="Expand this group">
+        <div class="kind"><span>Collapsed · ${g.nodes.length} ${g.nodes.length === 1 ? "box" : "boxes"}</span></div>
+      </header>
+      <div class="body"><ul class="stub-list">${g.nodes.map(id => `<li>${md(nodeById[id]?.title || id)}</li>`).join("")}</ul>
+        <button class="btn" data-gtoggle="${g.i}">Expand</button></div>`;
+    grid.appendChild(el);
+  }
+  $$(".node header").forEach(h => h.addEventListener("click", e => {
+    if (e.target.closest("a, .rv")) return;
+    const el = h.parentElement;
+    if (el.classList.contains("stub")) return toggleGroup(groups.find(g => `node-${g.id}` === el.id), true);
+    spotlight(el.id.slice(5));
+  }));
+  $$(".rv").forEach(b => b.addEventListener("click", () => toggleReviewed(b.dataset.rv)));
+  syncReviewed();
+  $$(".snaps img").forEach(img => img.addEventListener("click", () => openCompare(img.dataset.pair)));
+}
+
+// ---- Geometry ------------------------------------------------------------
+function rectOf(id) {
+  const el = $("#node-" + id);
+  return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+}
+// Columns stack independently: `row` orders boxes within a column. `alignWith` pushes a box
+// down to the top of a box placed before it, and `after` pushes it below one.
+const GAP_X = 140, GAP_Y = 110, PAD = 110;
+// `extra` adds space above a box, so a group header has room above its top boxes.
+// Returns where each item landed, and the bottom of whatever sits above it in its column.
+function placeNodes(extra = {}) {
+  const cols = {};
+  layoutItems().forEach(n => (cols[n.col] ||= []).push(n));
+  const pos = {};
+  let x = PAD, bottom = 0;
+  for (const c of Object.keys(cols).map(Number).sort((a, b) => a - b)) {
+    const list = cols[c].sort((a, b) => a.row - b.row);
+    let y = PAD, width = 0, above = null;
+    for (const n of list) {
+      const el = $("#node-" + n.id);
+      if (n.alignWith && pos[n.alignWith]) y = Math.max(y, pos[n.alignWith].y);
+      if (n.after && pos[n.after]) y = Math.max(y, pos[n.after].y + pos[n.after].h + GAP_Y);
+      y += extra[n.id] || 0;
+      pos[n.id] = { x, y, h: el.offsetHeight, above, placedBy: n.alignWith || n.after };
+      el.style.left = x + "px"; el.style.top = y + "px";
+      above = y + el.offsetHeight;
+      y += el.offsetHeight + GAP_Y;
+      width = Math.max(width, el.offsetWidth);
+    }
+    bottom = Math.max(bottom, y - GAP_Y);
+    x += width + GAP_X;
+  }
+  grid.style.width = x - GAP_X + PAD + "px";
+  grid.style.height = bottom + PAD + "px";
+  return pos;
+}
+// How much each group's top boxes must move down so its header fits above them.
+const FRAME_TOP = 30;
+function headerRoom(pos) {
+  const extra = {};
+  for (const g of groups) {
+    const f = $(`.frame[data-g="${g.i}"]`);
+    if (!f) continue;
+    const ids = shownIds(g.nodes).filter(id => pos[id]);
+    const top = Math.min(...ids.map(id => pos[id].y));
+    const need = f.headerSpace + 24;
+    const byCol = {};
+    ids.forEach(id => { const p = pos[id]; if (!byCol[p.x] || p.y < byCol[p.x].y) byCol[p.x] = { id, ...p }; });
+    // Regions that start at the top of the canvas all start on one line, however tall their header.
+    // A box placed by alignWith or after a box outside the region keeps its spot, so its region
+    // is left out of this; one placed by a box inside the region simply moves with it.
+    const tops = Object.values(byCol);
+    if (tops.every(p => p.above == null && (!p.placedBy || ids.includes(p.placedBy)))) {
+      tops.filter(p => !p.placedBy).forEach(p => { extra[p.id] = FRAME_TOP + f.headerSpace - top; });
+      continue;
+    }
+    for (const p of Object.values(byCol)) {
+      const available = top - (p.above ?? 0) - (p.above == null ? 0 : 34);
+      const short = need - available;
+      if (short > 0) extra[p.id] = Math.max(extra[p.id] || 0, short);
+    }
+  }
+  return extra;
+}
+function renderFrames() {
+  $$(".frame").forEach(f => f.remove());
+  const reviewed = store.get().reviewed || {};
+  groups.forEach(g => {
+    const rs = shownIds(g.nodes).map(rectOf);
+    const x1 = Math.min(...rs.map(r => r.x)) - 34, minY = Math.min(...rs.map(r => r.y));
+    const x2 = Math.max(...rs.map(r => r.x + r.w)) + 34, y2 = Math.max(...rs.map(r => r.y + r.h)) + 34;
+    const f = document.createElement("div");
+    f.className = "frame";
+    f.dataset.g = g.i;
+    f.dataset.nodes = shownIds(g.nodes).join(" ");
+    f.style.setProperty("--g", `var(--g-${groupColor(g, g.i)})`);
+    Object.assign(f.style, { left: x1 + "px", width: x2 - x1 + "px" });
+    const done = g.nodes.every(id => reviewed[id]);
+    const collapsed = isCollapsed(g);
+    f.innerHTML = `<div class="ghead">
+      <div class="gtop"><span class="gt">${md(g.title)}</span><span class="gacts">
+        <button class="grv${done ? " on" : ""}" data-grv="${g.i}" title="Mark every box in this group reviewed"><span class="bx">${done ? "✓" : ""}</span><span class="lb">${done ? "Reviewed" : "Review"}</span></button>
+        <button data-gtoggle="${g.i}" title="${collapsed ? "Show" : "Hide"} the boxes in this group">${collapsed ? "Expand ▾" : "Collapse ▴"}</button>
+      </span></div>
+      ${g.summary ? `<div class="gs">${md(g.summary)}</div>` : ""}</div>`;
+    grid.appendChild(f);
+    f.headerSpace = f.querySelector(".ghead").offsetHeight + 24;
+    const y1 = minY - f.headerSpace;
+    Object.assign(f.style, { top: y1 + "px", height: y2 - y1 + "px" });
+  });
+}
+grid.addEventListener("click", e => {
+  const toggle = e.target.closest("[data-gtoggle]");
+  if (toggle) return toggleGroup(groups[+toggle.dataset.gtoggle]);
+  const tick = e.target.closest("[data-grv]");
+  if (tick) toggleGroupReviewed(groups[+tick.dataset.grv]);
+});
+const GROUP_COLORS = ["blue", "violet", "teal", "amber", "rose", "green", "slate"];
+const groupColor = (g, i) => GROUP_COLORS.includes(g.color) ? g.color : GROUP_COLORS[i % GROUP_COLORS.length];
+function chooseSides(a, b) {
+  const gapX = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
+  const gapY = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+  if (gapX > 30 && gapX >= gapY) return b.x > a.x ? ["r", "l"] : ["l", "r"];
+  return b.y > a.y ? ["b", "t"] : ["t", "b"];
+}
+function renderEdges() {
+  const W = grid.offsetWidth, H = grid.offsetHeight;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--edge)"/></marker>
+    <marker id="arrow-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker></defs>`;
+  $$(".elabel").forEach(e => e.remove());
+  // An edge into a collapsed group points at its stub; edges inside one group disappear.
+  const seen = new Set();
+  const edges = story.edges.map(e => ({ ...e, from: shown(e.from), to: shown(e.to) }))
+    .filter(e => e.from !== e.to && !seen.has(`${e.from}>${e.to}`) && seen.add(`${e.from}>${e.to}`))
+    .map(e => {
+      const a = rectOf(e.from), b = rectOf(e.to);
+      const [sa, sb] = chooseSides(a, b);
+      return { ...e, a, b, sa, sb };
+    });
+  // Spread the ends that share a side, ordered by where the other end sits.
+  const ports = {};
+  edges.forEach((e, i) => {
+    (ports[`${e.from}:${e.sa}`] ||= []).push({ i, end: "a", other: e.b, side: e.sa });
+    (ports[`${e.to}:${e.sb}`] ||= []).push({ i, end: "b", other: e.a, side: e.sb });
+  });
+  for (const list of Object.values(ports)) {
+    const vertical = list[0].side === "l" || list[0].side === "r";
+    list.sort((p, q) => vertical ? (p.other.y + p.other.h / 2) - (q.other.y + q.other.h / 2) : (p.other.x + p.other.w / 2) - (q.other.x + q.other.w / 2));
+    list.forEach((p, k) => { edges[p.i][p.end + "f"] = (k + 1) / (list.length + 1); });
+  }
+  const anchor = (r, side, f) => ({
+    l: [r.x, r.y + Math.min(r.h, 260) * f], r: [r.x + r.w, r.y + Math.min(r.h, 260) * f],
+    t: [r.x + r.w * f, r.y], b: [r.x + r.w * f, r.y + r.h],
+  }[side]);
+  for (const e of edges) {
+    const [x1, y1] = anchor(e.a, e.sa, e.af), [x2, y2] = anchor(e.b, e.sb, e.bf);
+    const horizontal = e.sa === "r" || e.sa === "l";
+    const k = Math.max(50, Math.abs(horizontal ? x2 - x1 : y2 - y1) * .45);
+    const c = { l: [-k, 0], r: [k, 0], t: [0, -k], b: [0, k] };
+    const d = `M${x1},${y1} C${x1 + c[e.sa][0]},${y1 + c[e.sa][1]} ${x2 + c[e.sb][0]},${y2 + c[e.sb][1]} ${x2},${y2}`;
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", d); p.setAttribute("class", "edge"); p.setAttribute("marker-end", "url(#arrow)");
+    p.dataset.from = e.from; p.dataset.to = e.to;
+    svg.appendChild(p);
+    if (!e.label) continue;
+    const mid = p.getPointAtLength(p.getTotalLength() / 2);
+    const lab = document.createElement("div");
+    lab.className = "elabel"; lab.textContent = e.label;
+    lab.style.left = mid.x + "px"; lab.style.top = mid.y + "px";
+    lab.dataset.from = e.from; lab.dataset.to = e.to;
+    grid.appendChild(lab);
+  }
+}
+
+// ---- Rail ----------------------------------------------------------------
+function renderRail() {
+  const s = story, cov = s.coverage;
+  const prLink = s.pr.url ? `<a href="${esc(s.pr.url)}" target="_blank" rel="noopener">#${s.pr.number}</a>` : esc(s.pr.headRef);
+  const ticket = s.pr.ticket ? ` · <a href="${esc(s.pr.ticketURL)}" target="_blank" rel="noopener">${esc(s.pr.ticket)}</a>` : "";
+  $("#rail").innerHTML = `
+    <button class="rail-hide" id="rail-hide" title="Hide the story panel (S)">«</button>
+    <p class="eyebrow">PR story</p>
+    <h1>${esc(s.pr.title)}</h1>
+    <div class="meta">${prLink} · ${esc(s.pr.author)}${ticket}<br>${esc(s.pr.stats)}</div>
+    <div class="intent">${md(s.intent)}</div>
+    <div class="coverage ${cov.uncovered.length ? "bad" : ""}"><span class="dot"></span><span>${cov.uncovered.length
+      ? `<b>${cov.uncovered.length} changed spans aren't in the story.</b> They're listed on the canvas.`
+      : `Every changed line in the ${cov.files} text files is on the canvas, or listed as glue.`}</span></div>
+    <div class="storyhead"><p class="eyebrow">The story</p><span class="progress" id="progress"></span></div>
+    <ol class="chapters">${s.chapters.map((c, i) => `
+      <li data-i="${i}"><span class="n">${i + 1}</span><span class="t">${md(c.title)}</span><div class="s">${md(c.summary)}</div>
+        <label class="tick"><input type="checkbox" data-i="${i}"> Reviewed</label></li>`).join("")}
+    </ol>
+    ${s.checks.length ? `<p class="eyebrow">Claims, checked against the code</p>
+    <ul class="checks">${s.checks.map(c => `
+      <li><span class="badge ${c.status}">${c.status === "verified" ? "verified" : "your call"}</span>${md(c.text)}<div class="why">${md(c.why)}</div></li>`).join("")}
+    </ul>` : ""}
+    <p class="eyebrow" style="margin-top:20px">Review comments</p>
+    <div class="review-box" id="review-box"></div>
+    <p class="eyebrow">Legend</p>
+    <div class="legend">
+      <span style="--c:var(--changed)">changed</span><span style="--c:var(--context)">unchanged context</span>
+      <span style="--c:var(--test)">test</span><span style="--c:var(--ui)">app / visual</span>
+    </div>
+    <div class="hint"><kbd>←</kbd> <kbd>→</kbd> chapters · <kbd>0</kbd> overview · <kbd>S</kbd> panel · click a box's header to zoom in, <kbd>Esc</kbd> to step back, <kbd>R</kbd> marks it reviewed · drag the background to pan, or hold <kbd>Space</kbd> and drag anywhere, even on code · pinch or ⌘-scroll to zoom · click a line number to comment, or drag across several.</div>`;
+  $$(".chapters li").forEach(li => li.addEventListener("click", e => {
+    if (e.target.closest(".tick")) return;
+    go(+li.dataset.i);
+  }));
+  $$(".tick input").forEach(box => box.addEventListener("change", () => {
+    const state = store.get(), i = +box.dataset.i;
+    state.done = { ...(state.done || {}), [i]: box.checked };
+    // Ticking a chapter ticks its boxes; unticking it unticks them.
+    state.reviewed = { ...(state.reviewed || {}) };
+    story.chapters[i].nodes.forEach(id => { state.reviewed[id] = box.checked; });
+    store.set(state);
+    syncReviewed();
+  }));
+  syncDone();
+}
+// A chapter counts as reviewed when it's ticked, or when every box in it is.
+function chapterDone(i, state = store.get()) {
+  const reviewed = state.reviewed || {};
+  return !!(state.done || {})[i] || story.chapters[i].nodes.every(id => reviewed[id]);
+}
+function syncDone() {
+  const state = store.get();
+  $$(".chapters li").forEach(li => li.classList.toggle("done", chapterDone(+li.dataset.i, state)));
+  $$(".tick input").forEach(box => box.checked = chapterDone(+box.dataset.i, state));
+  const chapters = story.chapters.filter((_, i) => chapterDone(i, state)).length;
+  const boxes = story.nodes.filter(n => (state.reviewed || {})[n.id]).length;
+  $("#progress").textContent = chapters || boxes ? `${chapters}/${story.chapters.length} chapters · ${boxes}/${story.nodes.length} boxes` : "";
+}
+function toggleReviewed(id) {
+  const state = store.get();
+  state.reviewed = { ...(state.reviewed || {}), [id]: !(state.reviewed || {})[id] };
+  // Unticking a box un-ticks a chapter that was only done because of it.
+  if (!state.reviewed[id]) story.chapters.forEach((c, i) => { if (c.nodes.includes(id) && state.done) state.done[i] = false; });
+  store.set(state);
+  syncReviewed();
+}
+function syncReviewed() {
+  const reviewed = store.get().reviewed || {};
+  $$(".node:not(.stub)").forEach(el => {
+    const on = !!reviewed[el.id.slice(5)];
+    el.classList.toggle("reviewed", on);
+    el.querySelector(".rv .bx").textContent = on ? "✓" : "";
+    el.querySelector(".rv .lb").textContent = on ? "Reviewed" : "Review";
+  });
+  groups.forEach(g => {
+    const on = g.nodes.every(id => reviewed[id]);
+    $("#node-" + g.id)?.classList.toggle("reviewed", on);
+    const b = $(`.ghead [data-grv="${g.i}"]`);
+    if (!b) return;
+    b.classList.toggle("on", on);
+    b.querySelector(".bx").textContent = on ? "✓" : "";
+    b.querySelector(".lb").textContent = on ? "Reviewed" : "Review";
+  });
+  syncDone();
+  renderMinimap();
+}
+
+// ---- Review comments -----------------------------------------------------
+let reviewError = "", refreshing = false;
+function renderReviewBox() {
+  const box = $("#review-box");
+  if (!box) return;
+  const drafts = store.get().drafts || [];
+  const placed = comments.filter(c => !c.replyTo && c.line != null && renderedKeys.has(lineKey(c.path, c.side, c.line)));
+  const roots = comments.filter(c => !c.replyTo);
+  const unplaced = roots.filter(c => !placed.includes(c));
+  const parts = [];
+  if (!story.pr.number) parts.push(`<p class="muted">This story is for a local branch, so there's no PR to comment on yet.</p>`);
+  else {
+    parts.push(`<p>${roots.length ? `<b>${roots.length}</b> ${roots.length === 1 ? "thread" : "threads"} on GitHub, ${placed.length} on the canvas.` : "No review comments on GitHub yet."}
+      ${api ? `<a href="#" id="cm-refresh">${refreshing ? "Refreshing…" : "Refresh"}</a>` : ""}</p>`);
+    if (unplaced.length) parts.push(`<ul class="unplaced">${unplaced.map(c => `<li><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.path.split("/").pop())}${c.line ? `:${c.line}` : " (outdated)"}</a> · ${esc(c.user)}: ${esc(c.body.slice(0, 90))}${c.body.length > 90 ? "…" : ""}</li>`).join("")}</ul>`);
+    const mine = comments.filter(c => c.pending);
+    if (mine.length) parts.push(`<p style="margin-top:10px"><b>Your pending review</b> has ${mine.length} ${mine.length === 1 ? "comment" : "comments"}.
+      Only you can see ${mine.length === 1 ? "it" : "them"} until you submit the review.
+      <a href="${esc(story.pr.url + "/files")}" target="_blank" rel="noopener">Finish it on GitHub →</a></p>`);
+    if (drafts.length) {
+      // Drafts written before comments went straight to GitHub, or while the server was down.
+      parts.push(`<p style="margin-top:10px"><b>${drafts.length}</b> ${drafts.length === 1 ? "draft" : "drafts"} saved in this browser only.</p>
+        <div class="row">${api
+          ? `<button class="btn primary" id="send-review">Add ${drafts.length === 1 ? "it" : "them"} to your pending review</button>`
+          : `<span class="muted">Open this page through <code>serve.py</code> to send drafts.</span>`}</div>`);
+    }
+    if (!mine.length && !drafts.length) parts.push(`<p class="muted" style="margin-top:6px">Click a line number, or drag across several, to comment.
+      ${api ? "It goes straight into your pending review on GitHub, which only you see until you submit it." : "Comments are saved as drafts in this browser."}</p>`);
+    if (reviewError) parts.push(`<p class="err">${esc(reviewError)}</p>`);
+  }
+  box.innerHTML = parts.join("");
+  $("#cm-refresh")?.addEventListener("click", e => { e.preventDefault(); loadComments(); });
+  $("#send-review")?.addEventListener("click", sendDrafts);
+}
+async function loadComments() {
+  if (!api) return;
+  refreshing = true; renderReviewBox();
+  try {
+    comments = (await api.call("comments")).comments;
+  } catch (e) { reviewError = `Couldn't load comments: ${e.message}`; }
+  refreshing = false;
+  refreshCode();
+}
+// Moves local drafts into the pending review one at a time, so a failure keeps the rest.
+async function sendDrafts() {
+  const button = $("#send-review");
+  if (button) { button.disabled = true; button.textContent = "Adding…"; }
+  reviewError = "";
+  for (const d of store.get().drafts || []) {
+    try {
+      await api.call("comment", { method: "POST", body: JSON.stringify(d) });
+      const s = store.get(); s.drafts = (s.drafts || []).filter(x => x.id !== d.id); store.set(s);
+    } catch (e) { reviewError = `GitHub said no: ${e.message}`; break; }
+  }
+  await loadComments();
+}
+// Adds a comment to the pending review on GitHub (or saves a local draft without the server),
+// then reloads, so the page shows the comment as GitHub has it.
+async function submitComment(key, body) {
+  if (!api || editingDraft) return saveDraft(key, body);
+  const [path, side, line] = key.split("|");
+  const range = composerRange ? { startLine: composerRange.startLine, startSide: composerRange.startSide } : {};
+  composerText = body; saving = true; composerError = "";
+  refreshCode();
+  try {
+    if (editingRemote) await api.call("comment/edit", { method: "POST", body: JSON.stringify({ nodeId: editingRemote, body }) });
+    else await api.call("comment", { method: "POST", body: JSON.stringify({ path, side, line: +line, ...range, body }) });
+    saving = false;
+    closeComposer();
+    await loadComments();
+  } catch (e) {
+    saving = false;
+    composerError = `Not saved: ${e.message}`;
+    refreshCode();
+  }
+}
+async function deleteRemote(nodeId) {
+  confirmingDelete = null;
+  try { await api.call("comment/delete", { method: "POST", body: JSON.stringify({ nodeId }) }); reviewError = ""; }
+  catch (e) { reviewError = `Couldn't delete: ${e.message}`; }
+  await loadComments();
+}
+function saveDraft(key, body) {
+  const [path, side, line] = key.split("|");
+  const range = composerRange ? { startLine: composerRange.startLine, startSide: composerRange.startSide } : {};
+  const s = store.get();
+  s.drafts = s.drafts || [];
+  if (editingDraft) s.drafts = s.drafts.map(d => d.id === editingDraft ? { ...d, body } : d);
+  else s.drafts.push({ id: `d${Date.now()}`, path, side, line: +line, ...range, body });
+  store.set(s);
+  closeComposer();
+  refreshCode();
+}
+// Click a line number to comment on it; drag across line numbers (or the lines themselves) to
+// comment on a range. A range stays inside one diff hunk, since GitHub only accepts those.
+let lineDrag = null;
+grid.addEventListener("pointerdown", e => {
+  const ln = e.target.closest(".ln.cm");
+  if (!ln || e.button !== 0 || spaceHeld) return;
+  e.preventDefault();
+  const lns = [...ln.closest("pre.hunk").querySelectorAll(".ln.cm")];
+  lineDrag = { anchor: ln, end: ln, lns };
+  markDrag();
+});
+document.addEventListener("pointermove", e => {
+  if (!lineDrag) return;
+  const row = document.elementFromPoint(e.clientX, e.clientY)?.closest("pre.hunk > div");
+  const ln = row?.querySelector(".ln.cm");
+  if (!ln || !lineDrag.lns.includes(ln) || ln.dataset.h !== lineDrag.anchor.dataset.h || ln === lineDrag.end) return;
+  lineDrag.end = ln;
+  markDrag();
+});
+document.addEventListener("pointerup", () => {
+  if (!lineDrag) return;
+  const { anchor, end, lns } = lineDrag;
+  lineDrag = null;
+  const [a, b] = [lns.indexOf(anchor), lns.indexOf(end)].sort((x, y) => x - y);
+  const first = lns[a].dataset.key, last = lns[b].dataset.key;
+  if (a === b) {
+    // A plain click on the line the composer is already open for closes it.
+    composerKey = composerKey === last && !composerRange && !editingDraft && !editingRemote ? null : last;
+    composerRange = null;
+  } else {
+    const [path, startSide, startLine] = first.split("|"), [, side, line] = last.split("|");
+    composerKey = last;
+    composerRange = { path, startSide, startLine: +startLine, side, line: +line, startKey: first };
+  }
+  editingDraft = null; editingRemote = null; composerText = null; composerError = "";
+  refreshCode();
+});
+function markDrag() {
+  const { anchor, end, lns } = lineDrag;
+  const [a, b] = [lns.indexOf(anchor), lns.indexOf(end)].sort((x, y) => x - y);
+  const rows = lns.map(ln => ln.parentElement);
+  rows.forEach(r => r.classList.remove("rsel"));
+  const from = rows[a], to = rows[b];
+  // Light every row between the two ends, including rows without a comment target.
+  let r = from;
+  while (r) { if (r.matches("div")) r.classList.add("rsel"); if (r === to) break; r = r.nextElementSibling; }
+}
+grid.addEventListener("click", e => {
+  const expander = e.target.closest("[data-xp]");
+  if (expander) return expandExcerpt(expander.dataset.xp, +expander.dataset.k, expander.dataset.dir, +expander.dataset.count);
+  const toggle = e.target.closest(".thread-toggle");
+  if (toggle) {
+    const id = toggle.dataset.thread;
+    expandedThreads.has(id) ? expandedThreads.delete(id) : expandedThreads.add(id);
+    return refreshCode();
+  }
+  if (e.target.closest("[data-cancel]")) { closeComposer(); return refreshCode(); }
+  if (e.target.closest("[data-save]")) {
+    const ta = e.target.closest(".composer").querySelector("textarea");
+    return ta.value.trim() ? submitComment(ta.dataset.key, ta.value.trim()) : ta.focus();
+  }
+  const redit = e.target.closest("[data-redit]");
+  if (redit) {
+    const c = comments.find(x => x.nodeId === redit.dataset.redit);
+    closeComposer();
+    editingRemote = c.nodeId; composerKey = lineKey(c.path, c.side, c.line);
+    composerRange = c.startLine && c.startLine !== c.line ? { path: c.path, startSide: c.startSide || c.side, startLine: c.startLine, side: c.side,
+      line: c.line, startKey: lineKey(c.path, c.startSide || c.side, c.startLine) } : null;
+    return refreshCode();
+  }
+  if (e.target.closest("[data-rdel-cancel]")) { confirmingDelete = null; return refreshCode(); }
+  const rdel = e.target.closest("[data-rdel]");
+  if (rdel) {
+    if (confirmingDelete !== rdel.dataset.rdel) { confirmingDelete = rdel.dataset.rdel; return refreshCode(); }
+    return deleteRemote(rdel.dataset.rdel);
+  }
+  const edit = e.target.closest("[data-edit]");
+  if (edit) {
+    const d = (store.get().drafts || []).find(x => x.id === edit.dataset.edit);
+    closeComposer();
+    editingDraft = d.id; composerKey = lineKey(d.path, d.side, d.line);
+    composerRange = d.startLine ? { path: d.path, startSide: d.startSide, startLine: d.startLine, side: d.side, line: d.line,
+      startKey: lineKey(d.path, d.startSide, d.startLine) } : null;
+    return refreshCode();
+  }
+  const del = e.target.closest("[data-del]");
+  if (del) { const s = store.get(); s.drafts = (s.drafts || []).filter(x => x.id !== del.dataset.del); store.set(s); return refreshCode(); }
+});
+grid.addEventListener("keydown", e => {
+  if (!e.target.matches(".composer textarea")) return;
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (e.target.value.trim()) submitComment(e.target.dataset.key, e.target.value.trim()); }
+  else if (e.key === "Escape") { e.stopPropagation(); closeComposer(); refreshCode(); }
+});
+
+// ---- Minimap -------------------------------------------------------------
+function renderMinimap() {
+  const mm = $("#minimap");
+  const W = grid.offsetWidth, H = grid.offsetHeight;
+  if (!W || !H) return;
+  const reviewed = store.get().reviewed || {};
+  const lit = current >= 0 ? new Set(story.chapters[current].nodes) : null;
+  const frames = $$(".frame").map(f => `<rect x="${f.offsetLeft}" y="${f.offsetTop}" width="${f.offsetWidth}" height="${f.offsetHeight}" rx="40"
+    style="fill: color-mix(in srgb, ${f.style.getPropertyValue("--g")} 18%, transparent)"/>`).join("");
+  const litShown = lit && new Set(shownIds([...lit]));
+  const boxes = layoutItems().map(n => { const r = rectOf(n.id);
+    const rev = n.id.startsWith("__g") ? groups.find(g => g.id === n.id).nodes.every(id => reviewed[id]) : reviewed[n.id];
+    return `<rect class="mm-node${!lit || litShown.has(n.id) ? " lit" : ""}${rev ? " rev" : ""}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="16"/>`; }).join("");
+  mm.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${frames}${boxes}<rect class="mm-view" id="mm-view" rx="20"/></svg>`;
+  updateMinimapView();
+}
+function updateMinimapView() {
+  const v = $("#mm-view");
+  if (!v) return;
+  v.setAttribute("x", -cam.x / cam.z); v.setAttribute("y", -cam.y / cam.z);
+  v.setAttribute("width", viewport.clientWidth / cam.z); v.setAttribute("height", viewport.clientHeight / cam.z);
+}
+(() => {
+  const mm = $("#minimap");
+  let on = false;
+  const move = (e, animate) => {
+    const svgEl = mm.querySelector("svg");
+    if (!svgEl) return;
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(svgEl.getScreenCTM().inverse());
+    cam.x = viewport.clientWidth / 2 - p.x * cam.z; cam.y = viewport.clientHeight / 2 - p.y * cam.z;
+    apply(animate);
+  };
+  mm.addEventListener("pointerdown", e => { e.stopPropagation(); e.preventDefault(); on = true; mm.setPointerCapture(e.pointerId); move(e, true); });
+  mm.addEventListener("pointermove", e => { if (on) move(e, false); });
+  mm.addEventListener("pointerup", () => { on = false; });
+})();
+
+// ---- Camera --------------------------------------------------------------
+let cam = { x: 0, y: 0, z: 1 };
+function apply(animate) {
+  canvas.classList.toggle("animate", !!animate);
+  canvas.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})`;
+  viewport.style.backgroundPosition = `${cam.x}px ${cam.y}px`;
+  viewport.style.backgroundSize = `${22 * cam.z}px ${22 * cam.z}px`;
+  updateMinimapView();
+}
+function fit(ids, { animate = true, max = 1.1, pad = 60 } = {}) {
+  const rs = shownIds(ids).map(rectOf);
+  const top = 64, bottom = 56;
+  const x1 = Math.min(...rs.map(r => r.x)) - pad, y1 = Math.min(...rs.map(r => r.y)) - pad;
+  const x2 = Math.max(...rs.map(r => r.x + r.w)) + pad, y2 = Math.max(...rs.map(r => r.y + r.h)) + pad;
+  const vw = viewport.clientWidth, vh = viewport.clientHeight - top - bottom;
+  const z = Math.min(max, vw / (x2 - x1), vh / (y2 - y1));
+  cam = { z, x: (vw - (x2 - x1) * z) / 2 - x1 * z, y: top + (vh - (y2 - y1) * z) / 2 - y1 * z };
+  apply(animate);
+}
+let current = -1, spotted = null, focusIds = null;
+function focus(ids) {
+  focusIds = ids;
+  applyFocus();
+}
+// Re-applied after every layout, since frames and edges are redrawn then.
+function applyFocus() {
+  const set = focusIds && new Set(shownIds(focusIds));
+  // A chapter rings its boxes and lights their chapter number; nothing else changes opacity.
+  $$(".node").forEach(el => el.classList.toggle("inch", !!set && set.has(el.id.slice(5))));
+  $$(".node .pill").forEach(p => p.classList.toggle("on", !!set && +p.dataset.ch === current + 1));
+  // The cluster regions holding the open chapter's boxes get a stronger border.
+  $$(".frame").forEach(f => f.classList.toggle("active", !!set && f.dataset.nodes.split(" ").some(id => set.has(id))));
+  renderMinimap();
+  $$("path.edge, .elabel").forEach(el => {
+    const on = !set || (set.has(el.dataset.from) && set.has(el.dataset.to));
+    if (el.tagName === "path") {
+      el.classList.toggle("hot", !!set && on);
+      el.setAttribute("marker-end", !!set && on ? "url(#arrow-hot)" : "url(#arrow)");
+    }
+  });
+}
+function chip() {
+  const el = $("#chapter-chip");
+  if (current < 0) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  el.innerHTML = `<b>${current + 1} / ${story.chapters.length}</b>${md(story.chapters[current].title)}`;
+}
+function go(i, { animate = true } = {}) {
+  current = Math.max(0, Math.min(story.chapters.length - 1, i));
+  spotted = null;
+  $$(".node.spot").forEach(n => n.classList.remove("spot"));
+  const ch = story.chapters[current];
+  // Opening a chapter expands any collapsed group that holds its boxes.
+  const opening = groups.filter(g => isCollapsed(g) && g.nodes.some(id => ch.nodes.includes(id)));
+  if (opening.length) { opening.forEach(g => openedForChapter.add(g.id)); layout(); }
+  $$(".chapters li").forEach((li, j) => li.classList.toggle("active", j === current));
+  $(`.chapters li[data-i="${current}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  focus(ch.nodes);
+  fit(ch.nodes, { animate });
+  chip();
+  const state = store.get(); state.chapter = current; store.set(state);
+  history.replaceState(null, "", `#${current + 1}`);
+}
+function overview({ animate = true } = {}) {
+  current = -1; spotted = null;
+  $$(".chapters li").forEach(li => li.classList.remove("active"));
+  $$(".node.spot").forEach(n => n.classList.remove("spot"));
+  focus(null);
+  fit(layoutItems().map(n => n.id), { max: 1, animate });
+  chip();
+  const state = store.get(); state.chapter = -1; store.set(state);
+  history.replaceState(null, "", location.pathname + location.search);
+}
+function spotlight(id) {
+  if (hiddenNode(id)) toggleGroup(groupOfNode[id], true);
+  spotted = id;
+  $$(".node.spot").forEach(n => n.classList.remove("spot"));
+  $("#node-" + id).classList.add("spot");
+  $("#node-" + id).classList.remove("dim");
+  fit([id], { max: 1.6, pad: 40 });
+}
+function back() {
+  if ($("#lightbox").classList.contains("on")) return closeCompare();
+  if (spotted) { spotted = null; $$(".node.spot").forEach(n => n.classList.remove("spot")); return current < 0 ? overview() : go(current); }
+  overview();
+}
+
+// ---- Pan and zoom --------------------------------------------------------
+// Drag the background to pan. Hold Space (or use the middle button) to pan from anywhere,
+// even on top of code. Starting a pan never selects text.
+let drag = null, spaceHeld = false, suppressClick = false;
+viewport.addEventListener("pointerdown", e => {
+  if (e.target.closest("#toolbar, #minimap, #chapter-chip")) return;
+  const anywhere = spaceHeld || e.button === 1;
+  // Without Space, only the background pans; inside a box, dragging selects text as usual.
+  if (!anywhere && (e.button !== 0 || e.target.closest(".node, a, button, input, textarea, label, .tb, [data-interactive]"))) return;
+  e.preventDefault();
+  window.getSelection()?.removeAllRanges();
+  document.activeElement?.blur?.();
+  drag = { x: e.clientX - cam.x, y: e.clientY - cam.y, sx: e.clientX, sy: e.clientY, moved: false };
+  viewport.classList.add("dragging"); viewport.setPointerCapture(e.pointerId);
+});
+viewport.addEventListener("pointermove", e => {
+  if (!drag) return;
+  if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 4) drag.moved = true;
+  cam.x = e.clientX - drag.x; cam.y = e.clientY - drag.y; apply(false);
+});
+viewport.addEventListener("pointerup", () => {
+  suppressClick = !!drag?.moved;
+  drag = null; viewport.classList.remove("dragging");
+});
+// A pan that ends over a box header shouldn't also zoom into it.
+viewport.addEventListener("click", e => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); suppressClick = false; } }, true);
+const typing = e => e.target.closest?.("input, textarea, [contenteditable]");
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && !typing(e)) { e.preventDefault(); if (!spaceHeld) { spaceHeld = true; viewport.classList.add("space"); } }
+});
+document.addEventListener("keyup", e => { if (e.code === "Space") { spaceHeld = false; viewport.classList.remove("space"); } });
+window.addEventListener("blur", () => { spaceHeld = false; viewport.classList.remove("space"); });
+viewport.addEventListener("wheel", e => {
+  // A comment box with more text than fits scrolls itself instead of the canvas.
+  const box = e.target.closest("textarea");
+  if (box && !e.ctrlKey && !e.metaKey && box.scrollHeight > box.clientHeight) return;
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  if (e.ctrlKey || e.metaKey) {
+    const z = Math.min(2.4, Math.max(.15, cam.z * Math.exp(-e.deltaY * (e.ctrlKey && !e.metaKey ? .012 : .004))));
+    cam.x = mx - (mx - cam.x) * z / cam.z; cam.y = my - (my - cam.y) * z / cam.z; cam.z = z;
+  } else { cam.x -= e.deltaX; cam.y -= e.deltaY; }
+  apply(false);
+}, { passive: false });
+
+// ---- Compare lightbox ----------------------------------------------------
+function openCompare(path) {
+  const n = story.nodes.find(x => x.kind === "snaps" && x.pairs.some(p => p.path === path));
+  const p = n.pairs.find(q => q.path === path);
+  $("#lb-title").innerHTML = `<b class="mono">${esc(p.name)}</b> · ${esc(p.label)}`;
+  const cmp = $("#lb-cmp");
+  if (!p.before || !p.after) {
+    cmp.innerHTML = `<img src="${p.after || p.before}" alt="">`;
+  } else {
+    cmp.innerHTML = `<img src="${p.before}" alt="before"><img class="after" src="${p.after}" alt="after"><div class="bar"></div>
+      <span class="tag" style="left:8px">Before</span><span class="tag" style="right:8px">After</span>`;
+  }
+  cmp.style.setProperty("--split", "50%");
+  $("#lightbox").classList.add("on");
+}
+function closeCompare() { $("#lightbox").classList.remove("on"); }
+(() => {
+  const cmp = $("#lb-cmp");
+  let on = false;
+  const set = e => { const r = cmp.getBoundingClientRect(); cmp.style.setProperty("--split", `${Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100))}%`); };
+  cmp.addEventListener("pointerdown", e => { on = true; cmp.setPointerCapture(e.pointerId); set(e); });
+  cmp.addEventListener("pointermove", e => { if (on || e.pointerType === "mouse") set(e); });
+  cmp.addEventListener("pointerup", () => { on = false; });
+  $("#lb-close").onclick = closeCompare;
+  $("#lightbox").addEventListener("click", e => { if (e.target.id === "lightbox") closeCompare(); });
+})();
+
+// ---- Controls ------------------------------------------------------------
+// The panel opens and closes instantly, and the camera moves by the panel's width the other
+// way, so nothing on the canvas moves on screen.
+function toggleRail() {
+  const before = viewport.getBoundingClientRect().left;
+  $("#app").classList.toggle("collapsed");
+  cam.x -= viewport.getBoundingClientRect().left - before;
+  apply(false);
+  renderMinimap();
+  const state = store.get(); state.collapsed = $("#app").classList.contains("collapsed"); store.set(state);
+}
+document.addEventListener("keydown", e => {
+  if (typing(e)) return;
+  if ((e.key === "r" || e.key === "R") && spotted) toggleReviewed(spotted);
+  else if (e.key === "ArrowRight") go(current + 1);
+  else if (e.key === "ArrowLeft") go(current - 1);
+  else if (e.key === "0") overview();
+  else if (e.key === "Escape") back();
+  else if (e.key === "s" || e.key === "S") toggleRail();
+});
+$("#btn-next").onclick = () => go(current + 1);
+$("#btn-prev").onclick = () => go(current - 1);
+$("#btn-overview").onclick = () => overview();
+document.addEventListener("click", e => { if (e.target.closest("#rail-hide, #rail-show")) toggleRail(); });
+$("#btn-theme").onclick = () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+};
+
+// ---- Boot ----------------------------------------------------------------
+renderRail();
+renderNodes();
+function layout() {
+  applyCollapse();
+  const extra = headerRoom((placeNodes(), renderFrames(), placeNodes()));
+  if (Object.keys(extra).length) { placeNodes(extra); renderFrames(); }
+  renderEdges();
+  applyFocus();
+}
+let ready;
+const storyReady = new Promise(resolve => { ready = resolve; });
+window.addEventListener("load", () => {
+  layout();
+  const state = store.get();
+  if (state.collapsed) $("#app").classList.add("collapsed");
+  const fromHash = parseInt(location.hash.slice(1), 10);
+  const target = fromHash >= 1 && fromHash <= story.chapters.length ? fromHash - 1 : state.chapter;
+  const resume = Number.isInteger(target) && target >= 0 && target < story.chapters.length;
+  resume ? go(target, { animate: false }) : overview({ animate: false });
+  refreshCode();
+  ready();
+  loadComments();
+});
+
+// ---- Checking helpers, for whoever builds the story ------------------------
+// storyShow(3) jumps to chapter 3 with no animation, and storyShow(0) to the overview, once the page is ready.
+// Both lay the page out first: a background tab doesn't run the ResizeObserver that normally
+// re-places boxes when their height changes, so what they measure could be stale.
+window.storyShow = async n => {
+  await storyReady;
+  layout();
+  document.body.classList.add("instant");
+  n > 0 ? go(n - 1, { animate: false }) : overview({ animate: false });
+  setTimeout(() => document.body.classList.remove("instant"), 120);
+  // Timers, not requestAnimationFrame: a background tab pauses rAF.
+  await new Promise(r => setTimeout(r, 60));
+  return n > 0 ? `${n}/${story.chapters.length} ${story.chapters[n - 1].title}` : "overview";
+};
+// storyLint() lists layout problems: overlapping boxes, frames covering other boxes,
+// chapters whose boxes are lost in a mostly empty view, labels on boxes, very long edges.
+window.storyLint = async () => {
+  await storyReady;
+  layout();
+  const issues = [];
+  const R = Object.fromEntries(layoutItems().map(n => [n.id, rectOf(n.id)]));
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const box = ids => {
+    const rs = ids.map(id => R[id]);
+    const x = Math.min(...rs.map(r => r.x)), y = Math.min(...rs.map(r => r.y));
+    return { x, y, w: Math.max(...rs.map(r => r.x + r.w)) - x, h: Math.max(...rs.map(r => r.y + r.h)) - y };
+  };
+  const ids = Object.keys(R);
+  ids.forEach((a, i) => ids.slice(i + 1).forEach(b => { if (hit(R[a], R[b])) issues.push(`boxes overlap: ${a} and ${b}`); }));
+  for (const f of $$(".frame")) {
+    const g = groups[+f.dataset.g], own = f.dataset.nodes.split(" ");
+    const r = { x: f.offsetLeft, y: f.offsetTop, w: f.offsetWidth, h: f.offsetHeight };
+    ids.filter(id => !own.includes(id) && hit(r, R[id])).forEach(id => issues.push(`group "${g.title}" frame covers ${id}`));
+  }
+  story.chapters.forEach((c, i) => {
+    const mine = shownIds(c.nodes);
+    const b = box(mine);
+    const fill = mine.reduce((sum, id) => sum + R[id].w * R[id].h, 0) / (b.w * b.h);
+    const foreign = ids.filter(id => !mine.includes(id) && hit(b, R[id]));
+    if (mine.length > 1 && fill < .3) issues.push(`chapter ${i + 1} is spread out: its boxes fill ${Math.round(fill * 100)}% of its view` +
+      (foreign.length ? `, which also holds ${foreign.join(", ")}` : "") + ". Move its boxes closer together.");
+  });
+  $$(".elabel").forEach(l => {
+    const r = { x: l.offsetLeft - l.offsetWidth / 2, y: l.offsetTop - l.offsetHeight / 2, w: l.offsetWidth, h: l.offsetHeight };
+    ids.filter(id => hit(r, R[id])).forEach(id => issues.push(`edge label "${l.textContent}" (${l.dataset.from}→${l.dataset.to}) sits on ${id}`));
+  });
+  $$("path.edge").forEach(p => { if (p.getTotalLength() > 1600) issues.push(`edge ${p.dataset.from}→${p.dataset.to} is ${Math.round(p.getTotalLength())}px long`); });
+  return issues.length ? issues : ["clean"];
+};
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => current < 0 ? overview() : go(current), 120); });
+// Images loading or <details> opening change box heights; re-place once per frame.
+let layoutQueued = false;
+const relayout = () => { if (layoutQueued) return; layoutQueued = true; setTimeout(() => { layoutQueued = false; layout(); }, 16); };
+const sizeWatcher = new ResizeObserver(relayout);
+$$(".node").forEach(el => sizeWatcher.observe(el));
+</script>
+</body>
+</html>

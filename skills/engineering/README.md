@@ -11,6 +11,7 @@ Daily code work.
 - [improve-codebase-architecture](improve-codebase-architecture/SKILL.md) — find deepening and refactoring opportunities, informed by `CONTEXT.md` and `docs/adr/`.
 - [map-system](map-system/SKILL.md) — produce a deep, evidence-backed map of how a system is built (data model, async paths, API surface) into `_mapping/`.
 - [pr-comments](pr-comments/SKILL.md) — turn review findings into concise, inline-first PR comments and submit them as one GitHub review; brevity-first, with a human-owned verdict.
+- [pr-story](pr-story/SKILL.md) — turn a PR or branch into a local, interactive story page: real diff excerpts on a canvas, chapters in reading order, snapshot before/after and the PR's claims checked against the code; comments go only to the reviewer's pending GitHub review.
 - [propose-a-solution](propose-a-solution/SKILL.md) — autonomously design a bold solution and write it up, resolving the decision tree itself instead of interviewing.
 - [prototype](prototype/SKILL.md) — build a throwaway prototype (runnable terminal app or toggleable UI variations) to flesh out a design before committing.
 - [review-with-docs](review-with-docs/SKILL.md) — review a change branch against its spec (Linear issue, `CONTEXT.md`, ADRs) with running evidence, then apply the thermo-nuclear quality bar and an adversarial security-and-correctness pass.
